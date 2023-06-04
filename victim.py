@@ -82,12 +82,14 @@ def handle_client(client_socket):
         data = client_socket.recv(BUFFER_SIZE)
         if not data:
             break
-        print(f'Received data: {data.decode()}')
 # Get the data from the server
 # {instruction: 'download_file', filepath: 'C:\\Users\\user\\Desktop\\test.txt'}
 # Send the data to the server
 # {instruction: 'ok', file_size: 1234}`
         data = data.decode()
+        # replace ' with " for json.loads
+        data = data.replace("'", '"')
+        print(f'Received data: {data}')
         data = json.loads(data)
         if data['instruction'] == 'download_file':
             # check if file exists
@@ -95,20 +97,25 @@ def handle_client(client_socket):
                 # find file size
                 file_size = os.path.getsize(data['filepath'])
                 # send file size & ok to server
-                client_socket.sendall(f"instruction: 'ok', file_size: {file_size}".encode())
+                instruction = "{'instruction': 'ok', 'file_size': " + str(file_size) + "}"
+                client_socket.sendall(instruction.encode())
                 # send file to server
                 print(f'Sending file {data["filepath"]} to server ...')
                 with open(data['filepath'], 'rb') as f:
-                    bytes_to_send = f.read(BUFFER_SIZE)
-                    while bytes_to_send:
-                        client_socket.sendall(bytes_to_send)
+                    while True:
                         bytes_to_send = f.read(BUFFER_SIZE)
+                        if not bytes_to_send:
+                            # send {instruction: 'done'} to server
+                            # client_socket.sendall("{'instruction': 'done'}".encode())
+                            break
+                        client_socket.sendall(bytes_to_send)
+                    print(f'File {data["filepath"]} sent to server')
             else:
                 # send error to server
-                client_socket.sendall(f"instruction: 'error', message: 'file not found'".encode())
+                client_socket.sendall("{'instruction': 'error', 'message': 'file not found'}".encode())
         else:
             # send error to server
-            client_socket.sendall(f"instruction: 'error', message: 'unknown instruction'".encode())
+            client_socket.sendall("{'instruction': 'error', 'message': 'unknown instruction'}".encode())
 
 
 def main():
